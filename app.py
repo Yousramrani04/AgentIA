@@ -1,16 +1,12 @@
-from flask import Flask, redirect, url_for, session, request, render_template, jsonify
+from flask import Flask, redirect, url_for, session, request, render_template, jsonify, make_response
 from authlib.integrations.flask_client import OAuth
 import sqlite3
 import requests
 import os
-from dotenv import load_dotenv
 import re
 import threading
-import traceback
 
-
-load_dotenv()
-
+# --- Charger les secrets depuis Replit Environment Variables ---
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
@@ -87,7 +83,6 @@ def index():
         return redirect(url_for("chat"))
     return render_template("login.html")  # page avec bouton "Se connecter avec Google"
 
-# --- Login Google ---
 @app.route('/login')
 def login():
     redirect_uri = url_for('authorize', _external=True)
@@ -96,42 +91,29 @@ def login():
 @app.route('/authorize')
 def authorize():
     try:
-        # Récupère le token d'accès
         token = google.authorize_access_token()
-
-        # Récupère les infos utilisateur directement depuis Google
         resp = requests.get(
             'https://openidconnect.googleapis.com/v1/userinfo',
             headers={'Authorization': f"Bearer {token['access_token']}"}
         )
         userinfo = resp.json()
-
-        # Debug: affiche les infos récupérées
-        print("Userinfo:", userinfo)
-
-        # Stocke les infos dans la session
         session['user'] = {
             'email': userinfo.get('email'),
             'name': userinfo.get('name'),
             'picture': userinfo.get('picture')
         }
-
         return redirect(url_for("chat"))
-
     except Exception as e:
         import traceback
-        print("Erreur OAuth:")
         traceback.print_exc()
         return f"Échec de l'authentification Google. Détails : {e}"
 
-from flask import make_response
 @app.route('/logout')
 def logout():
-    session.clear()  # supprime toute la session
+    session.clear()
     resp = make_response(redirect("/"))
-    resp.set_cookie('session', '', expires=0)  # supprime le cookie de session côté client
+    resp.set_cookie('session', '', expires=0)
     return resp
-
 
 @app.route('/chat')
 def chat():
@@ -158,7 +140,6 @@ def send_message():
     user_text = request.json.get("message")
     save_message_async(user_email, "user", user_text)
 
-    # Historique pour IA
     conn = sqlite3.connect("chat_history.db")
     c = conn.cursor()
     c.execute("SELECT role, content FROM messages WHERE user_email=? ORDER BY id DESC LIMIT 10", (user_email,))
@@ -190,5 +171,7 @@ def send_message():
     except requests.exceptions.RequestException as e:
         return jsonify({"error": str(e)}), 500
 
+# --- Run Flask sur Replit ---
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
