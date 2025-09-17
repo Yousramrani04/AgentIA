@@ -6,9 +6,8 @@ import os
 import re
 import threading
 
-# --- Charger les secrets depuis Replit Environment Variables ---
+# --- Flask App ---
 app = Flask(__name__)
-app.config["SERVER_NAME"] = "agentia-production.up.railway.app"
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 # --- OAuth Google ---
@@ -21,7 +20,7 @@ google = oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-# --- DB ---
+# --- Database ---
 def init_db():
     conn = sqlite3.connect("chat_history.db")
     c = conn.cursor()
@@ -38,7 +37,7 @@ def init_db():
 
 init_db()
 
-# --- Sauvegarde asynchrone ---
+# --- Async save message ---
 def save_message_async(user_email, role, content):
     def save():
         conn = sqlite3.connect("chat_history.db")
@@ -51,10 +50,10 @@ def save_message_async(user_email, role, content):
         conn.close()
     threading.Thread(target=save).start()
 
-# --- Format IA response ---
+# --- Format AI response ---
 def format_ai_response(text):
     text = re.sub(r'◁think▷.*?◁/think▷', '', text, flags=re.DOTALL)
-    
+
     replacements = {
         "Objectif": "🎯 <b>Objectif</b>",
         "Action": "✅ <b>Action</b>",
@@ -86,7 +85,8 @@ def index():
 
 @app.route('/login')
 def login():
-    redirect_uri = url_for('authorize', _external=True)
+    # ✅ Redirect URI exact pour Google OAuth
+    redirect_uri = "https://agentia-production.up.railway.app/authorize"
     return google.authorize_redirect(redirect_uri, prompt="consent")
 
 @app.route('/authorize')
@@ -172,7 +172,7 @@ def send_message():
     except requests.exceptions.RequestException as e:
         return jsonify({"error": str(e)}), 500
 
-# --- Run Flask sur Replit ---
+# --- Run Flask ---
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
