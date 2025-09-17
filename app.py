@@ -8,6 +8,7 @@ import threading
 
 # --- Charger les secrets depuis Replit Environment Variables ---
 app = Flask(__name__)
+app.config["SERVER_NAME"] = "agentia-production.up.railway.app"
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 # --- OAuth Google ---
